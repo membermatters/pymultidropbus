@@ -1,2 +1,5 @@
 # pymultidropbus
-A python library that implements a cashless MDB peripheral for a waferlife "RS232-MDB" or "Pi2MDB" board.
+A python library that implements a cashless MDB peripheral over UART.
+This library should be compatible with most python environments that 
+support the `pyserial` library, and any serial hardware that supports 
+setting a sticky parity bit.
