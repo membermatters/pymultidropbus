@@ -42,27 +42,34 @@ def mode_bit_on():
     termios.tcsetattr(ser, termios.TCSANOW, [iflag,oflag,cflag,lflag,ispeed,ospeed,cc])
 
 
-def get_chk(command):
+def get_chk(command: str):
     chk = 0
     for cmd_byte in bytearray.fromhex(command):
         chk += cmd_byte
     return chk % 16**2  # ignore the carry bit if it overflows
 
 
-def get_ascii_from_hex(hex_string):
+def get_ascii_from_hex(hex_string: str):
     return bytearray.fromhex(hex_string).decode()
 
 
-def hex_to_int(hex_string):
+def hex_to_int(hex_string: str):
     return int(hex_string, 16)
+
+
+def int_to_hex(int_value: int, padding=2):
+    return f"{int_value:x}".zfill(padding)
+
+
+def cents_to_hex(int_value: int):
+    # returns a hex formatted string with the right padding to send to the VMC
+    return int_to_hex(int(int_value/10), 4)
 
 
 def send_ack():
     mode_bit_on()
     ser.write(bytearray.fromhex("00"))
     mode_bit_off()
-    print("Sent ACK")
-
 
 def send_cmd(command_string):
     command_string = command_string.replace(" ", "")
@@ -110,9 +117,11 @@ def parse_cmd():
 
 print("Connected to: ")
 print(ser.name)
+ser.reset_input_buffer()
 mode_bit_enable_mark()
 
 reader_state = "inactive"
+session_state = "idle"
 
 # send_cmd("02 32 02 32 42 4D 53 20 20 20 20 20 20 20 20 20 20 20 20 2E") # display BMS for 5 seconds?
 
@@ -122,7 +131,6 @@ while True:
     # this is the start of a new address byte
     if cmd_raw == "FF00":
         cmd = parse_cmd()
-        print()
 
         if cmd == "00":
             print("Got ACK")
@@ -160,8 +168,6 @@ while True:
             print(f"VMC feature level: {vmc_feature_level} Columns on display: {columns_on_display} "
                   f"Rows on display: {rows_on_display} Display type: {display_type}")
 
-            reader_state = "disabled"
-
             send_cmd("01 01 10 36 0A 02 07 0D")  # reader config data
 
         elif cmd[:4] == "1101":
@@ -169,13 +175,19 @@ while True:
             max_price = hex_to_int(cmd[4:8]) / 10
             min_price = hex_to_int(cmd[8:12]) / 10
             print(f"Min price: ${min_price} Max price: ${max_price}")
+            reader_state = "disabled"
             send_ack()
 
         elif cmd == "12":
-            print("Got CSH POLL 12")
-
             if reader_state == "inactive":
+                print("Got CSH POLL 12")
                 send_cmd("00")  # JUST RESET
+            elif reader_state == "disabled":
+                send_ack()
+            elif reader_state == "enabled":
+                credit = cents_to_hex(4200)
+                send_cmd("03" + credit)
+                reader_state = "idle"
             else:
                 send_ack()
 
@@ -184,10 +196,11 @@ while True:
             item_price = hex_to_int(cmd[4:8]) / 10
             item_number = None if hex_to_int(cmd[8:12]) == 0xFFFF else hex_to_int(cmd[8:12])
             print(f"Item price: ${item_price} Item number: {item_number}")
+            reader_state = "vend"
 
             approved = True
-            amount_charged = 25 # scale up by ten
-            amount_charged = f"{amount_charged:x}"
+            amount_charged = int(item_price * 10) # dollars scaled up by ten
+            amount_charged = int_to_hex(amount_charged)
 
             if approved:
                 send_cmd("05" + amount_charged)
@@ -202,6 +215,7 @@ while True:
             print("Got VEND SUCCESS")
             item_number = None if hex_to_int(cmd[4:8]) == 0xFFFF else hex_to_int(cmd[4:8])
             print(f"Item number: {item_number}")
+            reader_state = "idle"
 
             send_ack()
 
@@ -219,6 +233,7 @@ while True:
 
         elif cmd[:4] == "1304":
             print("Got VEND SESSION COMPLETE")
+            reader_state = "enabled"
             send_cmd("07")
 
         elif cmd[:4] == "1304":
