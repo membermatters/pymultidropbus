@@ -31,9 +31,9 @@ def int_to_hex(int_value: int, padding: int = 2):
     return f"{int_value:x}".zfill(padding)
 
 
-def cents_to_hex(int_value: int):
+def cents_to_hex(int_value: int, padding: int = 4):
     # returns a hex formatted string with the right padding to send to the VMC
-    return int_to_hex(int(int_value/10), 4)
+    return int_to_hex(int(int_value/10), padding)
 
 
 def get_command_object(command: str, data: object = None):
