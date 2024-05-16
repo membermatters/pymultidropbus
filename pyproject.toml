@@ -1,0 +1,21 @@
+[project]
+name = "pymultidropbus"
+version = "0.0.1"
+dependencies = [
+    "pyserial",
+]
+authors = [
+    { name = "Jaimyn Mayer", email = "hello@jaimyn.dev" },
+]
+description = "A Python library that implements a cashless MDB peripheral over UART."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/membermatters/pymultidropbus"
+Issues = "https://github.com/membermatters/pymultidropbus/issues"
