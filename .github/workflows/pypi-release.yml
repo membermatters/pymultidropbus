@@ -1,0 +1,34 @@
+name: PyPi Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  build-package:
+    name: Build our package.
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hynek/build-and-inspect-python-package@v2
+  pypi-publish:
+    name: Upload release to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://pypi.org/p/pywiegandpi
+    needs: build-package
+    permissions:
+      id-token: write
+    steps:
+    - name: Download packages built by previous step
+      uses: actions/download-artifact@v4
+      with:
+        name: Packages
+        path: dist
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
