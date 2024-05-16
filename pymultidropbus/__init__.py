@@ -1,14 +1,17 @@
+import logging
 import threading
+from collections import deque
 from queue import Queue
 from struct import pack
+
 import serial
 import termios
-import logging
+
 import pymultidropbus.helpers
 
 CMSPAR = 0x40000000
 
-SEND_POLL_COMMANDS = False
+SEND_POLL_COMMANDS = False  # be careful, there's A LOT of these and the library already handles the ACKs
 SEND_CC_COMMANDS = False
 SEND_BV_COMMANDS = False
 
@@ -143,25 +146,32 @@ class MDB:
             logger.info("Got NACK")
 
         elif cmd == "08":
+            # maybe one day this library will support being a coin changer
             # logger.debug("Got CC RESET")
-            if SEND_CC_COMMANDS:
-                self.commands_queue.put(helpers.get_command_object("CC_RESET"))
+            # self.commands_queue.put(helpers.get_command_object("CC_RESET"))
+            pass
 
         elif cmd == "0B":
+            # maybe one day this library will support being a coin changer
             # logger.debug("Got CC POLL")
-            if SEND_POLL_COMMANDS and SEND_CC_COMMANDS:
-                self.commands_queue.put(helpers.get_command_object("CC_POLL"))
+            # if SEND_POLL_COMMANDS:
+            #     self.commands_queue.put(helpers.get_command_object("CC_POLL"))
+            pass
 
         elif cmd == "30":
+            # maybe one day this library will support being a bill validator
             # logger.debug("Got BV RESET")
-            self.send_ack()
-            if SEND_BV_COMMANDS:
-                self.commands_queue.put(helpers.get_command_object("BV_RESET"))
+            # self.send_ack()
+            # if SEND_BV_COMMANDS:
+            #     self.commands_queue.put(helpers.get_command_object("BV_RESET"))
+            pass
 
         elif cmd == "33":
+            # maybe one day this library will support being a coin changer
             # logger.debug("Got BV POLL")
-            if SEND_POLL_COMMANDS and SEND_BV_COMMANDS:
-                self.commands_queue.put(helpers.get_command_object("BV_POLL"))
+            # if SEND_POLL_COMMANDS:
+            #     self.commands_queue.put(helpers.get_command_object("BV_POLL"))
+            pass
 
         elif cmd == "10":
             self.send_ack()
@@ -299,39 +309,47 @@ class MDB:
             self.commands_queue.put(helpers.get_command_object("UNKNOWN_CMD", {"command": cmd}))
 
     def check_for_command(self):
-        start_bytes = "xxxx"
+        start_bytes = deque(["xx"] * 2, maxlen=2)
 
-        # keep reading through bytes until we get the start of a packet
-        while start_bytes != "FF00":
+        # Keep reading through bytes until we get the start of a packet. The start of a packet is always an address byte
+        # with the 9th bit set, which shows as a parity error, which Linux marks by prepending 0xFF 0x00 to the byte.
+        while "".join(start_bytes) != "FF00":
             new_byte = self.serial_port.read(size=1).hex().upper()
             if new_byte:
-                start_bytes = start_bytes[2:] + new_byte
+                start_bytes.append(new_byte)
 
         command = self.serial_port.read(size=1).hex().upper()
 
+        # return straight away, these special packets don't have a checksum
         if command in ["00", "AA", "FF"]:
-            # return straight away, these special packets don't have a checksum
             self.process_cmd(command)
             return
 
         while True:
-            # MDB packets can't be longer than 36 bytes
-            if len(command) > 36 * 2:
+            # MDB packets can't be longer than 36 bytes. If we get to this point and the command is longer than 36
+            # bytes, something has gone wrong and we've probably got multiple packets all smashed together. Because we
+            # are relying on Linux to prepend 0xFF 0x00 to mark the 9th bit being set in address bytes, and these bytes
+            # may appear in the packet itself, we can't reliably use this to detect the start of a new packet halfway
+            # through a stream of bytes.
+
+            if len(command) > 36 * 2:  # * 2 because we're working with hex strings (e.g. FF)
                 logger.warning("Command too long, discarding: " + command)
                 return
+
+            # keep reading individual bytes until we get the checksum
             new_byte = self.serial_port.read(size=1).hex().upper()
             if new_byte:
-                full_command_checksum = helpers.get_chk(command)  # get checksum before adding the new byte
+                full_command_checksum = helpers.get_chk(command)  # get checksum of all existing bytes
 
+                # if the new byte is the checksum, we've got all the bytes so process the command
                 if helpers.hex_to_int(new_byte) == full_command_checksum:
-                    # we're at the end of the data block so return it
                     self.process_cmd(command)
                     return
                 else:
-                    # add the new byte to the command as it's not the checksum yet
+                    # if it's not the checksum yet, add the byte and keep going
                     command += new_byte
 
             else:
-                # we timed out waiting for the next byte
+                # we timed out while waiting for the next byte
                 logger.debug("Corrupt command, discarding: " + command)
                 return
