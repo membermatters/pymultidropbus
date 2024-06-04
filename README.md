@@ -29,3 +29,9 @@ issues. If your use case is not public facing or doesn't need high reliability, 
 Read more about dedicating one of your cores to a single
 process [here](https://floating.io/2023/04/raspberry-pi-in-real-time/), [here](https://stackoverflow.com/questions/13583146/whole-one-core-dedicated-to-single-process)
 and [here](https://stackoverflow.com/questions/74175771/how-to-run-t-threads-to-a-specific-cpu).
+
+## Usage
+
+Please check the `example.py` script for an example of how to use this library. Below is some documentation on each
+event that this library raises and the format of the associated data objects.
+

@@ -7,7 +7,7 @@ commands_queue = Queue()
 
 # Open a connection to the MDB bus via the specified serial port (which should have appropriate isolation and
 # level shifting to protect your device from the bus's potentially damaging high signal levels).
-mdb = pymultidropbus.MDB(commands_queue, "/dev/ttyAMA0")
+mdb = pymultidropbus.CashlessPeripheral(commands_queue, "/dev/ttyAMA0")
 
 while True:
     # Loop continuously and get the next command from the queue

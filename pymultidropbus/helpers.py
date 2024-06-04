@@ -1,6 +1,5 @@
 import time
 
-
 def get_chk(command: str):
     chk = 0
     for cmd_byte in bytearray.fromhex(command):
@@ -33,11 +32,4 @@ def int_to_hex(int_value: int, padding: int = 2):
 
 def cents_to_hex(int_value: int, padding: int = 4):
     # returns a hex formatted string with the right padding to send to the VMC
-    return int_to_hex(int(int_value/10), padding)
-
-
-def get_command_object(command: str, data: object = None):
-    return {
-        "command": command,
-        "data": data
-    }
+    return int_to_hex(int_value, padding)
