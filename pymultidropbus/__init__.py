@@ -32,11 +32,14 @@ class IncomingCommandThread(threading.Thread):
         self.logger = logging.getLogger("pymultidropbus:incoming_command_thread")
         self.logger.setLevel(log_level)
         self.logger.debug("Incoming command thread started")
+        self.process_affinity = process_affinity
 
-        if process_affinity:
-            affinity_mask = {process_affinity}
+    def start(self):
+        if self.process_affinity:
+            affinity_mask = {self.process_affinity}
             pid = 0  # 0 is the current process
             os.sched_setaffinity(pid, affinity_mask)
+        super().start()
 
     def stop(self):
         self._stop_event.set()
@@ -143,9 +146,12 @@ class Peripheral:
         # Keep reading through bytes until we get the start of a packet. The start of a packet is always an address byte
         # with the 9th bit set, which shows as a parity error, which Linux marks by prepending 0xFF 0x00 to the byte.
         while "".join(start_bytes) != "FF00":
-            new_byte = self.serial_port.read(size=1).hex().upper()
-            if new_byte:
-                start_bytes.append(new_byte)
+            try:
+                new_byte = self.serial_port.read(size=1).hex().upper()
+                if new_byte:
+                    start_bytes.append(new_byte)
+            except Exception:
+                continue
 
         command = self.serial_port.read(size=1).hex().upper()
 
